@@ -104,8 +104,9 @@ func GetDataFromRhmSecret(request reconcile.Request, sel corev1.SecretKeySelecto
 	return err, key
 }
 
-func AddSecretFieldsToStruct(razeeData map[string][]byte) (marketplacev1alpha1.RazeeConfigurationValues, []string, error){
-	var razeeStruct *marketplacev1alpha1.RazeeConfigurationValues = &marketplacev1alpha1.RazeeConfigurationValues{}
+func AddSecretFieldsToStruct(razeeData map[string][]byte,instance marketplacev1alpha1.RazeeDeployment) (marketplacev1alpha1.RazeeConfigurationValues, []string, error) {
+	// var razeeStruct *marketplacev1alpha1.RazeeConfigurationValues = &marketplacev1alpha1.RazeeConfigurationValues{}
+	razeeStruct := instance.Spec.DeployConfig
 	keys := []string{}
 	expectedKeys := []string{
 		IBM_COS_URL_FIELD,
@@ -118,38 +119,45 @@ func AddSecretFieldsToStruct(razeeData map[string][]byte) (marketplacev1alpha1.R
 	}
 
 	for key, element := range razeeData {
-		keys = append(keys,key)
+		keys = append(keys, key)
 		value, err := RetrieveSecretField(element)
 		if err != nil {
-			//TODO: better way to handle this here? 
+			//TODO: better way to handle this here?
 			razeeStruct = nil
-			return *razeeStruct, nil, err
+			return marketplacev1alpha1.RazeeConfigurationValues{}, nil, err
 		}
 
 		switch key {
-			case IBM_COS_READER_KEY_FIELD: razeeStruct.IbmCosReaderKey = &corev1.SecretKeySelector{
+		case IBM_COS_READER_KEY_FIELD:
+			razeeStruct.IbmCosReaderKey = &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: RHM_OPERATOR_SECRET_NAME,
-				}, 
+				},
 				Key: key,
 			}
 
-			case BUCKET_NAME_FIELD : razeeStruct.BucketName = value
+		case BUCKET_NAME_FIELD:
+			razeeStruct.BucketName = value
 
-			case IBM_COS_URL_FIELD: razeeStruct.IbmCosURL = value
+		case IBM_COS_URL_FIELD:
+			razeeStruct.IbmCosURL = value
 
-			case RAZEE_DASH_ORG_KEY_FIELD: razeeStruct.RazeeDashOrgKey = &corev1.SecretKeySelector{
+		case RAZEE_DASH_ORG_KEY_FIELD:
+			razeeStruct.RazeeDashOrgKey = &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: RHM_OPERATOR_SECRET_NAME,
-				}, 
+				},
 				Key: key,
 			}
 
-			case CHILD_RRS3_YAML_FIELD: razeeStruct.ChildRSSFIleName = value
+		case CHILD_RRS3_YAML_FIELD:
+			razeeStruct.ChildRSS3FIleName = value
 
-			case RAZEE_DASH_URL_FIELD: razeeStruct.RazeeDashUrl = value
+		case RAZEE_DASH_URL_FIELD:
+			razeeStruct.RazeeDashUrl = value
 
-			case FILE_SOURCE_URL_FIELD: razeeStruct.FileSourceURL = value
+		case FILE_SOURCE_URL_FIELD:
+			razeeStruct.FileSourceURL = value
 
 		}
 	}

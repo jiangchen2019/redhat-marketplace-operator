@@ -24,20 +24,20 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 // Configuration values used by Razee to communicate with the Red Hat Marketplace backend
 type RazeeConfigurationValues struct {
-	// BucketName is the name of the bucket in Cloud Object Storage and correlates to your accountID
-	BucketName string `json:"BUCKET_NAME,omitempty"`
-	// The file name of the child RemoteResourecS3
-	ChildRSSFIleName string `json:"CHILD_RRS3_YAML_FILENAME,omitempty"`
-	// The url of the filesource arg that gets passed into the razeedeploy-job
-	FileSourceURL string `json:"FILE_SOURCE_URL,omitempty"`
 	// Api key used to access the bucket IBM COS
-	IbmCosReaderKey *corev1.SecretKeySelector `json:"IBM_COS_READER_KEY,omitempty"`
+	IbmCosReaderKey *corev1.SecretKeySelector `json:"ibmCosReaderKey,omitempty"`
+	// BucketName is the name of the bucket in Cloud Object Storage and correlates to your accountID
+	BucketName string `json:"bucketName,omitempty"`
 	// Base url for the instance of IBM COS
-	IbmCosURL string `json:"IBM_COS_URL,omitempty"`
+	IbmCosURL string `json:"ibmCosUrl,omitempty"`
 	// Key used to identify a particular razee instance
-	RazeeDashOrgKey *corev1.SecretKeySelector `json:"RAZEE_DASH_ORG_KEY,omitempty"`
+	RazeeDashOrgKey *corev1.SecretKeySelector `json:"razeeDashOrgKey,omitempty"`
+	// The file name of the child RemoteResourecS3
+	ChildRSS3FIleName string `json:"childRRS3FileName,omitempty"`
 	// Url used by the razee install to post data
-	RazeeDashUrl string `json:"RAZEE_DASH_URL,omitempty"`
+	RazeeDashUrl string `json:"razeeDashUrl,omitempty"`
+	// The url of the filesource arg that gets passed into the razeedeploy-job
+	FileSourceURL string `json:"fileSourceUrl,omitempty"`
 }
 
 // RazeeDeploymentSpec defines the desired state of RazeeDeployment

@@ -196,7 +196,7 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 			reqLogger.Info("all secret values found")
 
 			//construct the childURL
-			url := fmt.Sprintf("%s/%s/%s/%s", instance.Spec.DeployConfig.IbmCosURL, instance.Spec.DeployConfig.BucketName, instance.Spec.ClusterUUID, instance.Spec.DeployConfig.ChildRSSFIleName)
+			url := fmt.Sprintf("%s/%s/%s/%s", instance.Spec.DeployConfig.IbmCosURL, instance.Spec.DeployConfig.BucketName, instance.Spec.ClusterUUID, instance.Spec.DeployConfig.ChildRSS3FIleName)
 			instance.Spec.ChildUrl = &url
 			err = r.client.Update(context.TODO(), instance)
 			if err != nil {
@@ -640,7 +640,7 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 		job := r.makeRazeeJob(request, instance)
 
 		// Check if the Job exists already
-		// TODO: amending the request, is that desireable ? 
+		// TODO: amending the request, is that desireable ?
 		req := reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      utils.RAZEE_DEPLOY_JOB_NAME,
@@ -894,7 +894,7 @@ func (r *ReconcileRazeeDeployment) reconcileRhmOperatorSecret(instance marketpla
 	}
 
 	razeeConfigurationValues := marketplacev1alpha1.RazeeConfigurationValues{}
-	razeeConfigurationValues, missingItems, err := utils.AddSecretFieldsToStruct(rhmOperatorSecret.Data)
+	razeeConfigurationValues, missingItems, err := utils.AddSecretFieldsToStruct(rhmOperatorSecret.Data, instance)
 	instance.Status.MissingDeploySecretValues = missingItems
 	instance.Spec.DeployConfig = &razeeConfigurationValues
 
@@ -1109,7 +1109,7 @@ func (r *ReconcileRazeeDeployment) makeWatchKeeperConfig(instance *marketplacev1
 }
 
 // Uses the SecretKeySelector struct to to retrieve byte data from a specified key
-// TODO: see zach's comment. Make generic. 
+// TODO: see zach's comment. Make generic.
 func (r *ReconcileRazeeDeployment) GetDataFromRhmSecret(request reconcile.Request, sel corev1.SecretKeySelector) ([]byte, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "request.Name", request.Name)
 	reqLogger.Info("Beginning of rhm-operator-secret reconcile")
