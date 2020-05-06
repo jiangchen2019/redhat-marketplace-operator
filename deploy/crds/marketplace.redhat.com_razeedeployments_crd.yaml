@@ -44,18 +44,18 @@ spec:
               description: Configuration values provided from redhat marketplace These
                 are used internally by the Operator
               properties:
-                BUCKET_NAME:
+                bucketName:
                   description: BucketName is the name of the bucket in Cloud Object
                     Storage and correlates to your accountID
                   type: string
-                CHILD_RRS3_YAML_FILENAME:
+                childRRS3FileName:
                   description: The file name of the child RemoteResourecS3
                   type: string
-                FILE_SOURCE_URL:
+                fileSourceUrl:
                   description: The url of the filesource arg that gets passed into
                     the razeedeploy-job
                   type: string
-                IBM_COS_READER_KEY:
+                ibmCosReaderKey:
                   description: Api key used to access the bucket IBM COS
                   properties:
                     key:
@@ -72,10 +72,10 @@ spec:
                   required:
                   - key
                   type: object
-                IBM_COS_URL:
+                ibmCosUrl:
                   description: Base url for the instance of IBM COS
                   type: string
-                RAZEE_DASH_ORG_KEY:
+                razeeDashOrgKey:
                   description: Key used to identify a particular razee instance
                   properties:
                     key:
@@ -92,7 +92,7 @@ spec:
                   required:
                   - key
                   type: object
-                RAZEE_DASH_URL:
+                razeeDashUrl:
                   description: Url used by the razee install to post data
                   type: string
               type: object
@@ -101,7 +101,8 @@ spec:
                 variables are stored.
               type: string
             enabled:
-              description: Enabled flag stops razee from installing
+              description: Setting enabled to "true" will create a Razee namespace
+                and deploy it's componenets. Set to "false" to bypass Razee installation
               type: boolean
             targetNamespace:
               description: TargetNamespace is configurable target of the razee namespace

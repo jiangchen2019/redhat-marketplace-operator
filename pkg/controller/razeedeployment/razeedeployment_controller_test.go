@@ -20,13 +20,10 @@ import (
 	"time"
 
 	"github.com/banzaicloud/k8s-objectmatcher/patch"
-	"github.com/spf13/viper"
-	// marketplacev1alpha1 "github.ibm.com/symposium/redhat-marketplace-operator/pkg/apis/marketplace/v1alpha1"
-	// . "github.ibm.com/symposium/redhat-marketplace-operator/test/controller"
-
-	. "github.com/redhat-marketplace/redhat-marketplace-operator/test/controller"
-
 	marketplacev1alpha1 "github.com/redhat-marketplace/redhat-marketplace-operator/pkg/apis/marketplace/v1alpha1"
+	"github.com/redhat-marketplace/redhat-marketplace-operator/pkg/utils"
+	. "github.com/redhat-marketplace/redhat-marketplace-operator/test/controller"
+	"github.com/spf13/viper"
 	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +43,7 @@ func TestRazeeDeployController(t *testing.T) {
 
 	viper.Set("assets", "../../../assets")
 
-	// t.Run("Test Clean Install", testCleanInstall)
+	t.Run("Test Clean Install", testCleanInstall)
 	t.Run("Test No Secret", testNoSecret)
 	// t.Run("Test Old Install", testOldMigratedInstall)
 }
@@ -102,13 +99,13 @@ var (
 			Namespace: "redhat-marketplace-operator",
 		},
 		Data: map[string][]byte{
-			IBM_COS_READER_KEY_FIELD: []byte("ibm-cos-reader-key"),
-			IBM_COS_URL_FIELD:        []byte("ibm-cos-url"),
-			BUCKET_NAME_FIELD:        []byte("bucket-name"),
-			RAZEE_DASH_ORG_KEY_FIELD: []byte("razee-dash-org-key"),
-			CHILD_RRS3_YAML_FIELD:    []byte("childRRS3-filename"),
-			RAZEE_DASH_URL_FIELD:     []byte("razee-dash-url"),
-			FILE_SOURCE_URL_FIELD:    []byte("file-source-url"),
+			utils.IBM_COS_READER_KEY_FIELD: []byte("ibm-cos-reader-key"),
+			utils.IBM_COS_URL_FIELD:        []byte("ibm-cos-url"),
+			utils.BUCKET_NAME_FIELD:        []byte("bucket-name"),
+			utils.RAZEE_DASH_ORG_KEY_FIELD: []byte("razee-dash-org-key"),
+			utils.CHILD_RRS3_YAML_FIELD:    []byte("childRRS3-filename"),
+			utils.RAZEE_DASH_URL_FIELD:     []byte("razee-dash-url"),
+			utils.FILE_SOURCE_URL_FIELD:    []byte("file-source-url"),
 		},
 	}
 )
@@ -127,7 +124,7 @@ func testCleanInstall(t *testing.T) {
 					opts,
 					WithName("rhm-operator-secret"),
 					WithNamespace(namespace),
-					WithExpectedResult(reconcile.Result{RequeueAfter: time.Second * 30}),
+					WithExpectedResult(reconcile.Result{}),
 				)...,
 			),
 			NewReconcilerTestCase(
@@ -147,7 +144,7 @@ func testCleanInstall(t *testing.T) {
 						}
 
 						razeeController := ReconcileRazeeDeployment{}
-						expectedWatchKeeperNonNamespace := razeeController.MakeWatchKeeperNonNamespace(&razeeDeployment)
+						expectedWatchKeeperNonNamespace := razeeController.makeWatchKeeperNonNamespace(&razeeDeployment)
 
 						patchResult, err := patch.DefaultPatchMaker.Calculate(watchKeeperNonNamespace, expectedWatchKeeperNonNamespace)
 						if !patchResult.IsEmpty() {
@@ -170,7 +167,7 @@ func testCleanInstall(t *testing.T) {
 						}
 
 						razeeController := ReconcileRazeeDeployment{}
-						expectedWatchKeeperLimitPoll := razeeController.MakeWatchKeeperLimitPoll(&razeeDeployment)
+						expectedWatchKeeperLimitPoll := razeeController.makeWatchKeeperLimitPoll(&razeeDeployment)
 
 						patchResult, err := patch.DefaultPatchMaker.Calculate(watchKeeperLimitPoll, expectedWatchKeeperLimitPoll)
 						if !patchResult.IsEmpty() {
@@ -195,7 +192,7 @@ func testCleanInstall(t *testing.T) {
 						}
 
 						razeeController := ReconcileRazeeDeployment{}
-						expectedRazeeClusterMetadata := razeeController.MakeRazeeClusterMetaData(&razeeDeployment)
+						expectedRazeeClusterMetadata := razeeController.makeRazeeClusterMetaData(&razeeDeployment)
 
 						patchResult, err := patch.DefaultPatchMaker.Calculate(razeeClusterMetadata, expectedRazeeClusterMetadata)
 						if !patchResult.IsEmpty() {
@@ -234,11 +231,11 @@ func testCleanInstall(t *testing.T) {
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "rhm-operator-secret",
 							},
-							Key: IBM_COS_READER_KEY_FIELD,
+							Key: utils.IBM_COS_READER_KEY_FIELD,
 						}
 
 						razeeController := ReconcileRazeeDeployment{}
-						expectedIbmCosReaderKey, err := razeeController.MakeCOSReaderSecret(&razeeDeployment, req)
+						expectedIbmCosReaderKey, err := razeeController.makeCOSReaderSecret(&razeeDeployment, req)
 
 						patchResult, err := patch.DefaultPatchMaker.Calculate(ibmCosReaderKey, &expectedIbmCosReaderKey)
 						if !patchResult.IsEmpty() {
@@ -293,6 +290,8 @@ var (
 		Spec: marketplacev1alpha1.RazeeDeploymentSpec{
 			Enabled:     true,
 			ClusterUUID: "foo",
+			//TODO: should old installs have a DeploySecretName
+			DeploySecretName: &secretName,
 		},
 		Status: marketplacev1alpha1.RazeeDeploymentStatus{
 			RazeeJobInstall: &marketplacev1alpha1.RazeeJobInstallStruct{
