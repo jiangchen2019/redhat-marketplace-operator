@@ -103,6 +103,7 @@ roles:
           - operators.coreos.com
         resources:
           - operatorgroups
+          - operatorsources
         verbs:
           - create
           - delete
