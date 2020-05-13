@@ -3,16 +3,16 @@
   "kind": "Namespace",
   "metadata": {
     "annotations": {
-      "openshift.io/sa.scc.mcs": "s0:c24,c4",
-      "openshift.io/sa.scc.supplemental-groups": "1000560000/10000",
-      "openshift.io/sa.scc.uid-range": "1000560000/10000"
+      "openshift.io/sa.scc.mcs": "s0:c23,c12",
+      "openshift.io/sa.scc.supplemental-groups": "1000530000/10000",
+      "openshift.io/sa.scc.uid-range": "1000530000/10000"
     },
-    "creationTimestamp": "2020-05-09T14:54:00Z",
-    "deletionTimestamp": "2020-05-09T15:01:53Z",
+    "creationTimestamp": "2020-05-13T00:06:24Z",
+    "deletionTimestamp": "2020-05-13T00:27:27Z",
     "name": "redhat-marketplace",
-    "resourceVersion": "218124",
+    "resourceVersion": "108520",
     "selfLink": "/api/v1/namespaces/redhat-marketplace",
-    "uid": "eb1612e8-9204-11ea-910a-0ef0e3c74fbe"
+    "uid": "957a1fcb-94ad-11ea-a251-0ef0e3c74fbe"
   },
   "spec": {
     "finalizers": []
@@ -20,35 +20,35 @@
   "status": {
     "conditions": [
       {
-        "lastTransitionTime": "2020-05-09T15:01:58Z",
+        "lastTransitionTime": "2020-05-13T00:27:33Z",
         "message": "All resources successfully discovered",
         "reason": "ResourcesDiscovered",
         "status": "False",
         "type": "NamespaceDeletionDiscoveryFailure"
       },
       {
-        "lastTransitionTime": "2020-05-09T15:01:58Z",
+        "lastTransitionTime": "2020-05-13T00:27:33Z",
         "message": "All legacy kube types successfully parsed",
         "reason": "ParsedGroupVersions",
         "status": "False",
         "type": "NamespaceDeletionGroupVersionParsingFailure"
       },
       {
-        "lastTransitionTime": "2020-05-09T15:01:58Z",
+        "lastTransitionTime": "2020-05-13T00:27:33Z",
         "message": "All content successfully deleted, may be waiting on finalization",
         "reason": "ContentDeleted",
         "status": "False",
         "type": "NamespaceDeletionContentFailure"
       },
       {
-        "lastTransitionTime": "2020-05-09T15:01:58Z",
+        "lastTransitionTime": "2020-05-13T00:27:33Z",
         "message": "Some resources are remaining: remoteresources.deploy.razee.io has 1 resource instances",
         "reason": "SomeResourcesRemain",
         "status": "True",
         "type": "NamespaceContentRemaining"
       },
       {
-        "lastTransitionTime": "2020-05-09T15:01:58Z",
+        "lastTransitionTime": "2020-05-13T00:27:33Z",
         "message": "Some content in the namespace has finalizers remaining: children.remoteresource.deploy.razee.io in 1 resource instances",
         "reason": "SomeFinalizersRemain",
         "status": "True",

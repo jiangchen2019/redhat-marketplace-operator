@@ -260,223 +260,135 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 	/******************************************************************************
 	APPLY OR UPDATE RAZEE RESOURCES
 	/******************************************************************************/
-	// razeeNamespace := &corev1.Namespace{}
-	// err = r.client.Get(context.TODO(), types.NamespacedName{Name: *instance.Spec.TargetNamespace}, razeeNamespace)
+	// result, err := r.createOrUpdate(request,instance, "razee" )
 	// if err != nil {
-	// 	if errors.IsNotFound(err) {
-	// 		reqLogger.Error(err,
-	// 			"targetNamespace does not exist, if you woult like to install into it you will need to create it",
-	// 			"targetNamespace", *instance.Spec.TargetNamespace)
-	// 		razeeNamespace.ObjectMeta.Name = *instance.Spec.TargetNamespace
-	// 		return reconcile.Result{RequeueAfter: time.Second * 60}, nil
-	// 	} else {
-	// 		reqLogger.Error(err, "Failed to get razee ns.")
-	// 		return reconcile.Result{}, err
-	// 	}
-	// }
-	// if err == nil {
-	// 	reqLogger.Info("razee namespace already exists")
+	// 	reqLogger.Error(err, "createOrUpdateFailed")
+	// } 
+	// if result.Requeue {
+	// 	return result, nil
 	// }
 
-	// if !utils.Contains(instance.Status.RazeePrerequisitesCreated, fmt.Sprintf("%v namespace", razeeNamespace.Name)) {
-	// 	instance.Status.RazeePrerequisitesCreated = append(instance.Status.RazeePrerequisitesCreated, fmt.Sprintf("%v namespace", razeeNamespace.Name))
-	// 	reqLogger.Info("updating Spec.RazeePrerequisitesCreated")
-
-	// 	err = r.client.Status().Update(context.TODO(), instance)
-	// 	if err != nil {
-	// 		reqLogger.Error(err, "Failed to update status")
-	// 		return reconcile.Result{}, err
-	// 	}
-	// }
-	err = r.createOrUpdate(request,instance, "razee" )
+	_,err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_NON_NAMESPACED_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-	err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_NON_NAMESPACED_NAME )
+	_,err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_LIMITPOLL_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-	err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_LIMITPOLL_NAME )
+
+	_,err = r.createOrUpdate(request,instance, utils.RAZEE_CLUSTER_METADATA_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-	err = r.createOrUpdate(request,instance, utils.RAZEE_CLUSTER_METADATA_NAME )
+	_,err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_CONFIG_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-	err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_CONFIG_NAME )
+
+	_,err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_SECRET_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-	err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_SECRET_NAME )
+	_,err = r.createOrUpdate(request,instance, utils.COS_READER_KEY_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-	err = r.createOrUpdate(request,instance, utils.COS_READER_KEY_NAME )
-	if err != nil {
-		reqLogger.Error(err, "createOrUpdateFailed")
-	} 
 	
 	/******************************************************************************
 	CREATE THE RAZEE JOB
 	/******************************************************************************/
-	if instance.Status.JobState.Succeeded != 1 {
-		reqLogger.Info("Job has not run successfully yet")
-		job := r.makeRazeeJob(request, instance)
+	reqLogger.Info("Finding RazeeDeploy Job")
+	job := r.makeRazeeJob(request, instance)
 
-		// Check if the Job exists already
-		req := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      utils.RAZEE_DEPLOY_JOB_NAME,
-				Namespace: request.Namespace,
-			},
-		}
-
-		foundJob := batch.Job{}
-		err = r.client.Get(context.TODO(), req.NamespacedName, &foundJob)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating razzeedeploy-job")
-			err = r.client.Create(context.TODO(), job)
-			if err != nil {
-				reqLogger.Error(err, "Failed to create Job on cluster")
-				return reconcile.Result{}, err
-			}
-			reqLogger.Info("job created successfully")
-			// requeue to grab the "foundJob" and continue to update status
-			// wait 30 seconds so the job has time to complete
-			// not entirely necessary, but the struct on Status.Conditions needs the Conditions in the job to be populated.
-			return reconcile.Result{RequeueAfter: time.Second * 30}, nil
-			// return reconcile.Result{Requeue: true}, nil
-			// return reconcile.Result{}, nil
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Job(s) from Cluster")
-			return reconcile.Result{}, err
-		}
-
-		if len(foundJob.Status.Conditions) == 0 {
-			reqLogger.Info("RazeeJob Conditions have not been propagated yet")
-			return reconcile.Result{RequeueAfter: time.Second * 30}, nil
-		}
-
-		if err := controllerutil.SetControllerReference(instance, &foundJob, r.scheme); err != nil {
-			reqLogger.Error(err, "Failed to set controller reference")
-			return reconcile.Result{}, err
-		}
-
-		// if the conditions have populated then update status
-		if len(foundJob.Status.Conditions) != 0 {
-			reqLogger.Info("RazeeJob Conditions have been propagated")
-			// Update status and conditions
-			instance.Status.JobState = foundJob.Status
-			for _, jobCondition := range foundJob.Status.Conditions {
-				instance.Status.Conditions = &jobCondition
-			}
-
-			secretName := "rhm-operator-secret"
-
-			if instance.Spec.DeploySecretName != nil {
-				secretName = *instance.Spec.DeploySecretName
-			}
-
-			instance.Status.RazeeJobInstall = &marketplacev1alpha1.RazeeJobInstallStruct{
-				RazeeNamespace:  secretName,
-				RazeeInstallURL: instance.Spec.DeployConfig.FileSourceURL,
-			}
-
-			err = r.client.Update(context.TODO(), instance)
-			if err != nil {
-				reqLogger.Error(err, "Failed to update JobState")
-				return reconcile.Result{}, err
-			}
-			reqLogger.Info("Updated JobState")
-		}
+	// Check if the Job exists already
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      utils.RAZEE_DEPLOY_JOB_NAME,
+			Namespace: request.Namespace,
+		},
 	}
 
-	// if the job succeeds apply the parentRRS3 and patch the Infrastructure and Console resources
-	if instance.Status.JobState.Succeeded == 1 {
-		parentRRS3 := &unstructured.Unstructured{}
-		parentRRS3.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "deploy.razee.io",
-			Kind:    "RemoteResourceS3",
-			Version: "v1alpha2",
-		})
+	foundJob := batch.Job{}
+	err = r.client.Get(context.TODO(), req.NamespacedName, &foundJob)
 
-		err = r.client.Get(context.TODO(), client.ObjectKey{Name: utils.PARENT_RRS3_RESOURCE_NAME, Namespace: *instance.Spec.TargetNamespace}, parentRRS3)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Resource does not exist", "resource: ", utils.RAZEE_JOB_NAME)
+		err = r.client.Create(context.TODO(), job)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				reqLogger.Info("Resource does not exist", "resource: ", utils.PARENT_RRS3)
-
-				parentRRS3 = r.makeParentRemoteResourceS3(instance)
-				if err := utils.ApplyAnnotation(parentRRS3); err != nil {
-					reqLogger.Error(err, "Failed to set annotation")
-				}
-				err = r.client.Create(context.TODO(), parentRRS3)
-				if err != nil {
-					reqLogger.Info("Failed to create resource", "resource: ", utils.PARENT_RRS3)
-					return reconcile.Result{}, err
-				}
-
-				reqLogger.Info("Resource created successfully", "resource: ", utils.PARENT_RRS3)
-			} else {
-				reqLogger.Info("Failed to get resource", "resource: ", utils.PARENT_RRS3)
-				return reconcile.Result{}, err
-			}
+			reqLogger.Error(err, "Failed to create Job on cluster")
+			return reconcile.Result{}, err
 		}
-		if err == nil {
-			reqLogger.Info("Resource already exists", "resource: ", utils.PARENT_RRS3)
+		reqLogger.Info("job created successfully")
+		// requeue to grab the "foundJob" and continue to update status
+		// wait 30 seconds so the job has time to complete
+		// not entirely necessary, but the struct on Status.Conditions needs the Conditions in the job to be populated.
+		return reconcile.Result{RequeueAfter: time.Second * 30}, nil
+		// return reconcile.Result{Requeue: true}, nil
+		// return reconcile.Result{}, nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get Job(s) from Cluster")
+		return reconcile.Result{}, err
+	}
 
-			updatedParentRRS3 := r.makeParentRemoteResourceS3(instance)
-			updatedParentRRS3.SetAnnotations(parentRRS3.GetAnnotations())
-			updatedParentRRS3.SetCreationTimestamp(parentRRS3.GetCreationTimestamp())
-			updatedParentRRS3.SetFinalizers(parentRRS3.GetFinalizers())
-			updatedParentRRS3.SetGeneration(parentRRS3.GetGeneration())
-			updatedParentRRS3.SetResourceVersion(parentRRS3.GetResourceVersion())
-			updatedParentRRS3.SetSelfLink(parentRRS3.GetSelfLink())
-			updatedParentRRS3.SetUID(parentRRS3.GetUID())
+	if len(foundJob.Status.Conditions) == 0 {
+		reqLogger.Info("RazeeJob Conditions have not been propagated yet")
+		return reconcile.Result{RequeueAfter: time.Second * 30}, nil
+	}
 
-			patchResult, err := patch.DefaultPatchMaker.Calculate(parentRRS3, updatedParentRRS3, patch.IgnoreStatusFields())
-			if err != nil {
-				reqLogger.Error(err, "Failed to compare patches")
-			}
+	if err := controllerutil.SetControllerReference(instance, &foundJob, r.scheme); err != nil {
+		reqLogger.Error(err, "Failed to set controller reference")
+		return reconcile.Result{}, err
+	}
 
-			if !patchResult.IsEmpty() {
-				reqLogger.Info("Change detected on resource", "resource: ", updatedParentRRS3.GetName())
-
-				parentRRS3.Object["spec"] = updatedParentRRS3.Object["spec"]
-
-				if err := utils.ApplyAnnotation(parentRRS3); err != nil {
-					reqLogger.Error(err, "Failed to set annotation")
-				}
-				reqLogger.Info("Updating resource", "resource: ", utils.PARENT_RRS3)
-				err = r.client.Update(context.TODO(), parentRRS3)
-				if err != nil {
-					reqLogger.Info("Failed to update resource", "resource: ", utils.PARENT_RRS3)
-					return reconcile.Result{}, err
-				}
-				reqLogger.Info("Resource updated successfully", "resource: ", utils.PARENT_RRS3)
-			}
-
-			reqLogger.Info("No change detected on resource", "resource: ", updatedParentRRS3.GetName())
+	// if the conditions have populated then update status
+	if len(foundJob.Status.Conditions) != 0 {
+		reqLogger.Info("RazeeJob Conditions have been propagated")
+		// Update status and conditions
+		instance.Status.JobState = foundJob.Status
+		for _, jobCondition := range foundJob.Status.Conditions {
+			instance.Status.Conditions = &jobCondition
 		}
 
-		if !utils.Contains(instance.Status.RazeePrerequisitesCreated, utils.PARENT_RRS3) {
-			instance.Status.RazeePrerequisitesCreated = append(instance.Status.RazeePrerequisitesCreated, utils.PARENT_RRS3)
-			reqLogger.Info("updating Status.RazeePrerequisitesCreated with parentRRS3")
+		secretName := "rhm-operator-secret"
 
-			err = r.client.Status().Update(context.TODO(), instance)
-			if err != nil {
-				reqLogger.Error(err, "Failed to update status")
-				return reconcile.Result{}, err
-			}
+		if instance.Spec.DeploySecretName != nil {
+			secretName = *instance.Spec.DeploySecretName
 		}
 
+		instance.Status.RazeeJobInstall = &marketplacev1alpha1.RazeeJobInstallStruct{
+			RazeeNamespace:  secretName,
+			RazeeInstallURL: instance.Spec.DeployConfig.FileSourceURL,
+		}
+
+		err = r.client.Status().Update(context.TODO(), instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update JobState")
+			return reconcile.Result{}, err
+		}
+
+		reqLogger.Info("Updated JobState")
+		
+	}
+
+
+	// if the job succeeds apply the parentRRS3 and patch the Infrastructure and Console resources
+	// if instance.Status.JobState.Succeeded == 1 {
+	if foundJob.Status.Succeeded == 1 {
+		result, err := r.createOrUpdate(request,instance, utils.PARENT_RRS3_RESOURCE_NAME)
+		if err != nil {
+			reqLogger.Error(err, "createOrUpdateFailed")
+		} 
+		if result.Requeue {
+			return result, nil
+		}
+	
 		/******************************************************************************
 		PATCH RESOURCES FOR DIANEMO
 		Patch the Console and Infrastructure resources with the watch-keeper label
@@ -538,9 +450,9 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 			reqLogger.Info("Patched Infrastructure resource")
 		}
 		reqLogger.Info("No patch needed on Infrastructure resource")
-
+		fmt.Println("JOB HAS SUCCEEDED TEST")
 	}
-
+	
 	reqLogger.Info("End of reconcile")
 	return reconcile.Result{}, nil
 
@@ -631,179 +543,211 @@ func (r *ReconcileRazeeDeployment) finalizeRazeeDeployment(req *marketplacev1alp
 	return reconcile.Result{}, nil
 }
 
+type CreateResourceFunctions struct { 
+    makeWatchKeeperNonNamespace func(*marketplacev1alpha1.RazeeDeployment)*corev1.ConfigMap
+    Pending   func(int, int) int
+} 
 
-func (r *ReconcileRazeeDeployment) createOrUpdate(request reconcile.Request,instance *marketplacev1alpha1.RazeeDeployment,resourceName string)(error){
-	funcMap := map[string]interface{}{
-		utils.WATCH_KEEPER_NON_NAMESPACED_NAME: r.makeWatchKeeperNonNamespace,
-		utils.WATCH_KEEPER_LIMITPOLL_NAME: r.makeWatchKeeperLimitPoll,
-		utils.RAZEE_CLUSTER_METADATA_NAME: r.makeRazeeClusterMetaData,
-		utils.WATCH_KEEPER_CONFIG_NAME: r.makeWatchKeeperConfig,
-		utils.WATCH_KEEPER_SECRET_NAME: r.makeWatchKeeperSecret, 
-		utils.COS_READER_KEY_NAME: r.makeCOSReaderSecret,
-	}
-	
-    for resourceName, v := range funcMap {
+func (r *ReconcileRazeeDeployment) createOrUpdate(request reconcile.Request,instance *marketplacev1alpha1.RazeeDeployment,resourceName string)(reconcile.Result,error){ 
         switch resourceName {
 			case "razee":
 				razeeNamespace := &corev1.Namespace{}
 				ns := types.NamespacedName{Name: *instance.Spec.TargetNamespace}
 				exists,err := r.checkIfResourceExists(request, razeeNamespace, ns.String())
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				if !exists {
-					// watchKeeperNonNamespace = *v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
 					razeeNamespace.ObjectMeta.Name = *instance.Spec.TargetNamespace
 					err := r.applyResourceIfNotFound(request, razeeNamespace)
 					if err != nil{
-						return err
+						return reconcile.Result{},err
 					}
 
-					r.addToStatus(*instance, request, "razee")
+					err = r.addToStatusIfNotPresent(instance, request, "razee")
+					if err != nil {
+						return reconcile.Result{},err
+					}
 				} 
 
 			case utils.WATCH_KEEPER_NON_NAMESPACED_NAME:
 				watchKeeperNonNamespace := corev1.ConfigMap{}
 				exists,err := r.checkIfResourceExists(request, &watchKeeperNonNamespace, utils.WATCH_KEEPER_NON_NAMESPACED_NAME)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				if !exists {
-					watchKeeperNonNamespace = *v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+					watchKeeperNonNamespace = *r.makeWatchKeeperNonNamespace(instance)
 					err := r.applyResourceIfNotFound(request, &watchKeeperNonNamespace)
 					if err != nil{
-						return err
+						return reconcile.Result{},err
 					}
-					
 				} 
 				
-				updatedWatchKeeperNonNameSpace := *v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
-				err = r.updateOnChange(*instance, request, &watchKeeperNonNamespace,&updatedWatchKeeperNonNameSpace, utils.WATCH_KEEPER_NON_NAMESPACED_NAME)
+				updatedWatchKeeperNonNameSpace := r.makeWatchKeeperNonNamespace(instance)
+				err = r.updateOnChange(*instance, request, &watchKeeperNonNamespace,updatedWatchKeeperNonNameSpace, utils.WATCH_KEEPER_NON_NAMESPACED_NAME)
 				if err != nil{
-					return err
+					return reconcile.Result{},err
 				}
 		
 			case utils.WATCH_KEEPER_LIMITPOLL_NAME:
 				watchKeeperLimitPoll := corev1.ConfigMap{}
 				exists, err := r.checkIfResourceExists(request, &watchKeeperLimitPoll, utils.WATCH_KEEPER_LIMITPOLL_NAME)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				if !exists{
-					watchKeeperLimitPoll = *v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+					watchKeeperLimitPoll = *r.makeWatchKeeperLimitPoll(instance)
 					err = r.applyResourceIfNotFound(request, &watchKeeperLimitPoll)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
+
 				} 
 				
-				updatedWatchKeeperLimitPoll := v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+				updatedWatchKeeperLimitPoll := r.makeWatchKeeperLimitPoll(instance)
 				err = r.updateOnChange(*instance, request, &watchKeeperLimitPoll,updatedWatchKeeperLimitPoll,utils.WATCH_KEEPER_LIMITPOLL_NAME)
 				if err != nil{
-					return err
+					return reconcile.Result{},err
 				}
 			case utils.RAZEE_CLUSTER_METADATA_NAME: 
 				razeeClusterMetadata := corev1.ConfigMap{}
 				exists, err := r.checkIfResourceExists(request, &razeeClusterMetadata, utils.RAZEE_CLUSTER_METADATA_NAME)
 				if err != nil {
-					return err 
+					return reconcile.Result{},err 
 				}
 				if !exists{
-					razeeClusterMetadata = *v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+					razeeClusterMetadata = *r.makeRazeeClusterMetaData(instance)
 					err = r.applyResourceIfNotFound(request, &razeeClusterMetadata)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
+
 				} 
 				
-				updatedRazeeClusterMetadata := v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+				updatedRazeeClusterMetadata := r.makeRazeeClusterMetaData(instance)
 				err = r.updateOnChange(*instance, request, &razeeClusterMetadata,updatedRazeeClusterMetadata,utils.RAZEE_CLUSTER_METADATA_NAME)
 				if err != nil{
-					return err
+					return reconcile.Result{},err
 				}
 			case utils.WATCH_KEEPER_CONFIG_NAME:
 				watchKeeperConfig := corev1.ConfigMap{}
 				exists, err := r.checkIfResourceExists(request, &watchKeeperConfig, utils.WATCH_KEEPER_CONFIG_NAME)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				if !exists{
-					watchKeeperConfig = *v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+					watchKeeperConfig = *r.makeWatchKeeperConfig(instance)
 					err = r.applyResourceIfNotFound(request, &watchKeeperConfig)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
+
 				} 
 				
-				updatedWatchKeeperConfig := v.(func(instance *marketplacev1alpha1.RazeeDeployment)(*corev1.ConfigMap))(instance)
+				updatedWatchKeeperConfig := r.makeWatchKeeperConfig(instance)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				err = r.updateOnChange(*instance, request, &watchKeeperConfig,updatedWatchKeeperConfig,utils.WATCH_KEEPER_CONFIG_NAME)
 				if err != nil{
-					return err
+					return reconcile.Result{},err
 				}
 			case utils.WATCH_KEEPER_SECRET_NAME: 
 				watchKeeperSecret := corev1.Secret{}
 				exists, err := r.checkIfResourceExists(request, &watchKeeperSecret, utils.WATCH_KEEPER_SECRET_NAME)
 				if err != nil {
-					return err 
+					return reconcile.Result{},err 
 				}
 				if !exists{
-					watchKeeperSecret, err = v.(func(instance *marketplacev1alpha1.RazeeDeployment, request reconcile.Request)(corev1.Secret,error))(instance,request)
+					watchKeeperSecret, err = r.makeWatchKeeperSecret(instance,request)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
 					err = r.applyResourceIfNotFound(request, &watchKeeperSecret)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
 				} 
 				
-				updatedWatchKeeperSecret,err := v.(func(instance *marketplacev1alpha1.RazeeDeployment,request reconcile.Request)(corev1.Secret,error))(instance,request)
+				updatedWatchKeeperSecret,err := r.makeWatchKeeperSecret(instance, request)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				err = r.updateOnChange(*instance, request, &watchKeeperSecret,&updatedWatchKeeperSecret,utils.WATCH_KEEPER_SECRET_NAME)
 				if err != nil{
-					return err
+					return reconcile.Result{},err
 				}
 			case utils.COS_READER_KEY_NAME:
 				ibmCosReaderKey := corev1.Secret{}
 				exists, err := r.checkIfResourceExists(request, &ibmCosReaderKey, utils.COS_READER_KEY_NAME)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				if !exists{
-					ibmCosReaderKey,err = v.(func(instance *marketplacev1alpha1.RazeeDeployment, request reconcile.Request)(corev1.Secret,error))(instance,request)
+					ibmCosReaderKey,err = r.makeCOSReaderSecret(instance,request)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
 					err = r.applyResourceIfNotFound(request, &ibmCosReaderKey)
 					if err != nil {
-						return err
+						return reconcile.Result{},err
 					}
+
 				} 
 				
-				updatedibmCosReaderKey, err := v.(func(instance *marketplacev1alpha1.RazeeDeployment, request reconcile.Request)(corev1.Secret,error))(instance,request)
+				updatedibmCosReaderKey, err := r.makeCOSReaderSecret(instance, request)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
 				err = r.updateOnChange(*instance, request, &ibmCosReaderKey,&updatedibmCosReaderKey,utils.COS_READER_KEY_NAME)
 				if err != nil {
-					return err
+					return reconcile.Result{},err
 				}
-        }
+			case utils.PARENT_RRS3_RESOURCE_NAME:
+				parentRRS3 := &unstructured.Unstructured{}
+				parentRRS3.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   "deploy.razee.io",
+					Kind:    "RemoteResourceS3",
+					Version: "v1alpha2",
+				})
+
+				exists, err := r.checkIfResourceExists(request, parentRRS3, utils.PARENT_RRS3_RESOURCE_NAME)
+				if err != nil {
+					return reconcile.Result{},err
+				}
+				if !exists{
+					parentRRS3 = r.makeParentRemoteResourceS3(instance)
+					err = r.applyResourceIfNotFound(request, parentRRS3)
+					if err != nil {
+						return reconcile.Result{},err
+					}
+
+				}
+
+				updatedParentRRS3 := r.makeParentRemoteResourceS3(instance)
+				updatedParentRRS3.SetAnnotations(parentRRS3.GetAnnotations())
+				updatedParentRRS3.SetCreationTimestamp(parentRRS3.GetCreationTimestamp())
+				updatedParentRRS3.SetFinalizers(parentRRS3.GetFinalizers())
+				updatedParentRRS3.SetGeneration(parentRRS3.GetGeneration())
+				updatedParentRRS3.SetResourceVersion(parentRRS3.GetResourceVersion())
+				updatedParentRRS3.SetSelfLink(parentRRS3.GetSelfLink())
+				updatedParentRRS3.SetUID(parentRRS3.GetUID())
+
+				err = r.updateUnstructuredResourceOnChange(*instance, request, parentRRS3,updatedParentRRS3,utils.PARENT_RRS3_RESOURCE_NAME)
+				if err != nil {
+					return reconcile.Result{},err
+				}
+        
 	}
 	
-	return nil
+	return reconcile.Result{Requeue: true},nil
 }
 
 func (r *ReconcileRazeeDeployment) applyResourceIfNotFound(request reconcile.Request, resource runtime.Object)error{
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Resource does not exist", "resource: ", utils.WATCH_KEEPER_NON_NAMESPACED_NAME)
 	if err := utils.ApplyAnnotation(resource); err != nil {
-		reqLogger.Error(err, "Failed to set annotation")
 		return err
 	}
 
@@ -815,13 +759,17 @@ func (r *ReconcileRazeeDeployment) applyResourceIfNotFound(request reconcile.Req
 	return nil
 }
 
-func(r *ReconcileRazeeDeployment) addToStatus(instance marketplacev1alpha1.RazeeDeployment, request reconcile.Request,resourceName string)(error){
+func(r *ReconcileRazeeDeployment) addToStatusIfNotPresent(instance *marketplacev1alpha1.RazeeDeployment, request reconcile.Request,resourceName string)(error){
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	if !utils.Contains(instance.Status.RazeePrerequisitesCreated,resourceName) {
+		
+		// patch := client.MergeFrom(instance.DeepCopy())
+
 		instance.Status.RazeePrerequisitesCreated = append(instance.Status.RazeePrerequisitesCreated, resourceName)
 		reqLogger.Info("updating Spec.RazeePrerequisitesCreated")
-	
-		err := r.client.Update(context.TODO(), &instance)
+		err := r.client.Status().Update(context.TODO(), instance)
+		// err := r.client.Status().Patch(context.TODO(), &instance, patch)
+		// err := r.client.Update(context.TODO(), &instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update status")
 			return err
@@ -857,7 +805,41 @@ func(r *ReconcileRazeeDeployment) updateOnChange(instance marketplacev1alpha1.Ra
 
 		reqLogger.Info("No change detected on resource", "resource: ", resourceName)
 
-		err = r.addToStatus(instance, request,resourceName)
+		err = r.addToStatusIfNotPresent(&instance,request,resourceName)
+		if err != nil {
+			return err
+		}
+		return nil
+}
+
+func(r *ReconcileRazeeDeployment) updateUnstructuredResourceOnChange(instance marketplacev1alpha1.RazeeDeployment,request reconcile.Request, currentResource interface{},updatedResource interface{}, resourceName string)error{
+	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+
+	patchResult, err := patch.DefaultPatchMaker.Calculate(currentResource.(runtime.Object), updatedResource.(runtime.Object),patch.IgnoreStatusFields())
+		if err != nil {
+			reqLogger.Error(err, "Failed to compare patches")
+			return err
+		}
+
+		if !patchResult.IsEmpty() {
+			reqLogger.Info("Change detected on resource", "resource: ", resourceName)
+			currentResource.(unstructured.Unstructured).Object["spec"] = updatedResource.(unstructured.Unstructured).Object["spec"]
+			if err := utils.ApplyAnnotation(updatedResource.(runtime.Object)); err != nil {
+				reqLogger.Error(err, "Failed to set annotation")
+				return err
+			}
+
+			reqLogger.Info("Updating resource", "resource: ", resourceName)
+			err = r.client.Update(context.TODO(), updatedResource.(runtime.Object))
+			if err != nil {
+				reqLogger.Error(err, "Failed to update resource", "resource: ", resourceName)
+				return err
+			}
+		}
+
+		reqLogger.Info("No change detected on resource", "resource: ", resourceName)
+
+		err = r.addToStatusIfNotPresent(&instance, request,resourceName)
 		if err != nil {
 			return err
 		}
@@ -876,8 +858,7 @@ func (r *ReconcileRazeeDeployment)checkIfResourceExists(request reconcile.Reques
 			return false, nil
 		} else {
 			reqLogger.Error(err, "Failed to get ","resource: ",resourceName)
-			// return reconcile.Result{}, err
-
+			return false, err
 		}
 	}
 	if err == nil{
