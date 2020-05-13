@@ -274,7 +274,6 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-
 	_,err = r.createOrUpdate(request,instance, utils.RAZEE_CLUSTER_METADATA_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
@@ -285,7 +284,6 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
 
-
 	_,err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_SECRET_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
@@ -295,7 +293,6 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
 	} 
-
 	
 	/******************************************************************************
 	CREATE THE RAZEE JOB
@@ -538,11 +535,6 @@ func (r *ReconcileRazeeDeployment) finalizeRazeeDeployment(req *marketplacev1alp
 	}
 	return reconcile.Result{}, nil
 }
-
-type CreateResourceFunctions struct { 
-    makeWatchKeeperNonNamespace func(*marketplacev1alpha1.RazeeDeployment)*corev1.ConfigMap
-    Pending   func(int, int) int
-} 
 
 func (r *ReconcileRazeeDeployment) createOrUpdate(request reconcile.Request,instance *marketplacev1alpha1.RazeeDeployment,resourceName string)(reconcile.Result,error){ 
         switch resourceName {
