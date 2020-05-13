@@ -732,6 +732,7 @@ func (r *ReconcileRazeeDeployment) createOrUpdate(request reconcile.Request,inst
 	return reconcile.Result{Requeue: true},nil
 }
 
+// applies the last annotation on the resource being applied then applies that resource to the cluster
 func (r *ReconcileRazeeDeployment) applyResourceIfNotFound(request reconcile.Request, resource runtime.Object)error{
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Resource does not exist", "resource: ", utils.WATCH_KEEPER_NON_NAMESPACED_NAME)
@@ -747,6 +748,7 @@ func (r *ReconcileRazeeDeployment) applyResourceIfNotFound(request reconcile.Req
 	return nil
 }
 
+// Will check if the resource name has been added to the status or not
 func(r *ReconcileRazeeDeployment) addToStatusIfNotPresent(instance *marketplacev1alpha1.RazeeDeployment, request reconcile.Request,resourceName string)(error){
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	if !utils.Contains(instance.Status.RazeePrerequisitesCreated,resourceName) {
@@ -762,7 +764,8 @@ func(r *ReconcileRazeeDeployment) addToStatusIfNotPresent(instance *marketplacev
 	return nil
 }
 
-
+// Checks the patch diff of the resources retrieved off the cluster and the proposed update (most recent resource)
+// Will update the resource if needed
 func(r *ReconcileRazeeDeployment) updateOnChange(instance marketplacev1alpha1.RazeeDeployment,request reconcile.Request, currentResource runtime.Object,updatedResource runtime.Object, resourceName string)error{
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	patchResult, err := patch.DefaultPatchMaker.Calculate(currentResource, updatedResource)
