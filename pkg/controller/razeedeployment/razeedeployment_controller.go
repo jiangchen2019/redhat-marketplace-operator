@@ -260,14 +260,10 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 	/******************************************************************************
 	APPLY OR UPDATE RAZEE RESOURCES
 	/******************************************************************************/
-	// result, err := r.createOrUpdate(request,instance, "razee" )
-	// if err != nil {
-	// 	reqLogger.Error(err, "createOrUpdateFailed")
-	// } 
-	// if result.Requeue {
-	// 	return result, nil
-	// }
-
+	_, err = r.createOrUpdate(request,instance, "razee" )
+	if err != nil {
+		reqLogger.Error(err, "createOrUpdateFailed")
+	} 
 	_,err = r.createOrUpdate(request,instance, utils.WATCH_KEEPER_NON_NAMESPACED_NAME )
 	if err != nil {
 		reqLogger.Error(err, "createOrUpdateFailed")
@@ -762,14 +758,9 @@ func (r *ReconcileRazeeDeployment) applyResourceIfNotFound(request reconcile.Req
 func(r *ReconcileRazeeDeployment) addToStatusIfNotPresent(instance *marketplacev1alpha1.RazeeDeployment, request reconcile.Request,resourceName string)(error){
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	if !utils.Contains(instance.Status.RazeePrerequisitesCreated,resourceName) {
-		
-		// patch := client.MergeFrom(instance.DeepCopy())
-
 		instance.Status.RazeePrerequisitesCreated = append(instance.Status.RazeePrerequisitesCreated, resourceName)
 		reqLogger.Info("updating Spec.RazeePrerequisitesCreated")
 		err := r.client.Status().Update(context.TODO(), instance)
-		// err := r.client.Status().Patch(context.TODO(), &instance, patch)
-		// err := r.client.Update(context.TODO(), &instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update status")
 			return err
