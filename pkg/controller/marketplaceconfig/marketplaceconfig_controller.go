@@ -49,7 +49,8 @@ const (
 var (
 	log                      = logf.Log.WithName("controller_marketplaceconfig")
 	marketplaceConfigFlagSet *pflag.FlagSet
-	defaultFeatures          = []string{RAZEE_FLAG, METERBASE_FLAG}
+	defaultFeatures          = []string{RAZEE_FLAG}
+	// defaultFeatures          = []string{RAZEE_FLAG, METERBASE_FLAG}
 )
 
 // Init declares our FlagSet for the MarketplaceConfig

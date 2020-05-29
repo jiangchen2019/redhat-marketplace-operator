@@ -260,7 +260,7 @@ func (r *ReconcileRazeeDeployment) Reconcile(request reconcile.Request) (reconci
 		if utils.Contains(instance.GetFinalizers(), utils.RAZEE_DEPLOYMENT_FINALIZER) {
 			//Run finalization logic for the RAZEE_DEPLOYMENT_FINALIZER.
 			//If it fails, don't remove the finalizer so we can retry during the next reconcile
-			return r.partialUninstall(instance)
+			return r.fullUninstall(instance)
 		}
 		return reconcile.Result{}, nil
 	}
@@ -1386,9 +1386,24 @@ func (r *ReconcileRazeeDeployment) fullUninstall(
 	req *marketplacev1alpha1.RazeeDeployment,
 ) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
-	reqLogger.Info("Starting partial uninstall of razee")
+	reqLogger.Info("Starting full uninstall of razee")
 
 	deletePolicy := metav1.DeletePropagationForeground
+
+	foundJob := batch.Job{}
+	reqLogger.Info("finding uninstall job")
+	jobName := types.NamespacedName{
+		Name:      "razeedeploy-job",
+		Namespace: req.Namespace,
+	}
+	err := r.client.Get(context.TODO(), jobName, &foundJob)
+	if err == nil || errors.IsNotFound(err) {
+		reqLogger.Info("cleaning up install job")
+		err = r.client.Delete(context.TODO(), &foundJob, client.PropagationPolicy(deletePolicy))
+		if err != nil && !errors.IsNotFound(err) {
+			reqLogger.Error(err, "cleaning up install job failed")
+		}
+	}
 
 	reqLogger.Info("Deleting rrs3")
 	rrs3 := &unstructured.Unstructured{}
@@ -1397,35 +1412,6 @@ func (r *ReconcileRazeeDeployment) fullUninstall(
 		Kind:    "RemoteResourceS3",
 		Version: "v1alpha2",
 	})
-
-	reqLogger.Info("Patching rrs3 child")
-
-	err := r.client.Get(context.TODO(), types.NamespacedName{
-		Name:      "child",
-		Namespace: *req.Spec.TargetNamespace,
-	}, rrs3)
-
-	if err == nil {
-		reqLogger.Info("found child rrs3, patching reconcile=false")
-
-		childLabels := rrs3.GetLabels()
-
-		reconcileVal, ok := childLabels["deploy.razee.io/Reconcile"]
-
-		if !ok || (ok && reconcileVal != "false") {
-			rrs3.SetLabels(map[string]string{
-				"deploy.razee.io/Reconcile": "false",
-			})
-
-			err = r.client.Update(context.TODO(), rrs3)
-			if err != nil {
-				reqLogger.Error(err, "error updating child resource")
-			} else {
-				// requeue so the label can take affect
-				return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-			}
-		}
-	}
 
 	reqLogger.Info("Deleteing rrs3")
 	rrs3Names := []string{"parent", "child"}
@@ -1459,7 +1445,7 @@ func (r *ReconcileRazeeDeployment) fullUninstall(
 		Namespace: *req.Spec.TargetNamespace,
 	}, rr)
 
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		reqLogger.Error(err, "razeedeploy-auto-update not found with error")
 	}
 
